@@ -2,6 +2,10 @@ FROM nvidia/cuda:11.4.1-devel-ubuntu20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+WORKDIR /
+COPY video-api/docker/nvenc-api/3bf863cc.pub /
+RUN  apt-key add /3bf863cc.pub
+
 RUN apt-get update && apt-get install -y tzdata
 
 ENV TZ=Asia/Tokyo 
