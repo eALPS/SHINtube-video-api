@@ -44,6 +44,27 @@ class encoder_class:
             "software": False
         }
 
+    def audio_noise_reduction_command(
+            self,
+            folderpath: str,
+            filename: str,
+            nr_filename: str):
+        """
+        オーディオのノイズ低減処理
+        """
+
+        command = [
+            "ffmpeg",
+            "-hide_banner",
+            "-y",
+            f"-i {folderpath}/{filename}",
+            "-af anlmdn=0.00001:0.002:0.006:1:11",
+            "-c:v",
+            "copy",
+            f"{folderpath}/{nr_filename}"
+        ]
+        return command
+
     def audio_encode_command(
             self,
             folderpath: str,
@@ -397,8 +418,17 @@ class encoder_class:
 
         # audioのエンコード
         logger.info(f"音声エンコード開始 {folderpath}")
+
+        # ノイズ低減処理
+        nr_filename = filename + ".nr.mp4"
+        command = self.audio_noise_reduction_command(
+            folderpath, filename, nr_filename)
+
+        logger.info(f"ノイズ低減処理 {command} ")
+        await general_module.command_run(command, "./")
+
         command = self.audio_encode_command(
-            folderpath, filename, bitrate)
+            folderpath, nr_filename, bitrate)
 
         # エンコード実行
         await general_module.command_run(command, "./")
@@ -410,6 +440,7 @@ class encoder_class:
 
         # 空のaudio.doneを作成
         (encode_path / "audio.done").touch()
+        (encode_path / nr_filename).unlink()
 
         return True
 
