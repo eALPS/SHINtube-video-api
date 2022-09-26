@@ -452,7 +452,7 @@ class encoder_class:
 
         logger.info(f"エンコード開始 {folderpath} {resolution}")
         # 音声エンコード(別タスクで実行)
-        asyncio.create_task(self.encode_audio(folderpath, filename))
+        audio_encode_task = asyncio.create_task(self.encode_audio(folderpath, filename))
 
         encoder = await self.get_encode_command(
             folderpath, filename, resolution)
@@ -463,6 +463,9 @@ class encoder_class:
         logger.info(f"エンコード終了 {folderpath} {resolution}")
         # エンコーダーを開放
         self.encoder_used_status[encoder.encoder] = False
+
+        # 音声エンコード終了待ち
+        await audio_encode_task
 
         if result.returncode == 0:
             return True
