@@ -58,6 +58,7 @@ class encoder_class:
             "-hide_banner",
             "-y",
             f"-i {folderpath}/{filename}",
+            "-max_muxing_queue_size 1024",
             "-af anlmdn=0.00001:0.002:0.006:1:11",
             "-c:v",
             "copy",
