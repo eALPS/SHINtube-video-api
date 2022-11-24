@@ -43,7 +43,7 @@ RUN apt-get update && \
 
 WORKDIR /WORKDIR
 
-RUN git clone https://github.com/FFmpeg/nv-codec-headers.git &&\
+RUN git clone -b sdk/11.1 https://github.com/FFmpeg/nv-codec-headers.git &&\
     cd nv-codec-headers && \
     make install && \
     cd /WORKDIR && \
