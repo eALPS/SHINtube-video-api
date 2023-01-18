@@ -14,8 +14,15 @@ from ..module.logger import logger
 
 
 class FilemanagerClass:
-    # 保存先のビデオフォルダ
-    video_dir = "video"
+    # データディレクトリのトップ
+    root_dir = "video"
+
+    # ファイルの実体が保存されるディレクトリ
+    files_dir = root_dir + "/files"
+    # コース毎のディレクトリのトップ
+    #   Ver.1 の backend_web との後方互換のため video で終わること
+    video_dir = root_dir + "/links/video"
+
     # m3u8のテンプレート
     m3u8 = {
         "init": [
@@ -60,8 +67,30 @@ class FilemanagerClass:
             "1080p.m3u8"],
     }
 
+
     def __init__(self):
         pass
+
+
+    def make_files_dirname_from_name(self, filename):
+        """
+        ファイル名から，そのファイルの実体が保存されるディレクトリのパスを生成
+        """
+        ret_path = "/".join([self.files_dir, filename[0:2], filename[2:4], filename])
+        return ret_path
+
+
+    async def make_symlink(self, filename, service_name, cid):
+        """
+        シンボリックリンクを作成
+        """
+        # コースディレクトリ内にヴィデオディレクトリをシンボリックリンクで作成
+        video_path = "/".join([self.video_dir, service_name, cid, filename])
+        video_dir = pathlib.Path(video_path)
+        #   シンボリックリンクを相対パスで
+        symlink = "../../../../" + self.make_files_dirname_from_name(filename)
+        video_dir.symlink_to(symlink)
+
 
     def remove_duplicates(self, _dict: dict) -> dict:
         """
@@ -71,6 +100,7 @@ class FilemanagerClass:
             if isinstance(_dict[key], list):
                 _dict[key] = list(set(_dict[key]))
         return _dict
+
 
     def write_json(self, json_file, python_dict):
         """
@@ -88,14 +118,19 @@ class FilemanagerClass:
         # ファイル書き込み
         return general_module.write_json(json_file, python_dict)
 
+
     async def write_file(self,
                          file_path: str,
                          in_file: UploadFile = File(...)):
+        """
+        ファイルをを書き込む関数
+        """
         file_path = str(file_path)
         await general_module.write_file(file_path, in_file)
         folder_path = pathlib.Path(file_path).parent
         # 空のfile.doneを作成
         (folder_path / "file.done").touch()
+
 
     async def write_playlist(
             self, playlist_file: str, resolution: str = "init"):
@@ -126,6 +161,7 @@ class FilemanagerClass:
             # print('\n'.join(write_data))
             await f.write("\n".join(write_data) + "\n")
 
+
     async def create_directory(self, directory_path) -> None:
         """
         ディレクトリの作成関数
@@ -140,26 +176,41 @@ class FilemanagerClass:
         except Exception as e:
             return str(e)
 
+
     async def create_video_directory(
             self, service_name, cid, title, explanation, meta_data) -> str:
         """
         ビデオディレクトリの作成関数
         """
-        _created_dir = None
-        cid_path = "/".join([self.video_dir, service_name, cid])
-        cid_path = pathlib.Path(cid_path)
+        files_dirname = None
+        files_path = None
+        course_dirname = None
+        course_path = None
+        #
         while True:
+            # 保存用ディレクトリ名を生成
             temp_dir_name = general_module.GetRandomStr(40)
-            _created_dir = cid_path / temp_dir_name
-            if _created_dir.exists():
+            files_dirname = self.video_dir + "/" + self.make_files_dirname_from_name(temp_dir_name)
+            files_path = pathlib.Path(files_dirname)
+            print(files_dirname)
+            # 名前衝突のチェック
+            if files_path.exists():
                 continue
             else:
-                _created_dir.mkdir(parents=True)
+                # 保存用ディレクトリ作成
+                files_path.mkdir(parents=True)
+                # コースディレクトリを確認・作成
+                course_dirname = "/".join([self.video_dir, service_name, cid])
+                course_path = pathlib.Path(course_dirname)
+                if not(course_path.exists()):
+                    course_path.mkdir(parents=True)
+                # コースディレクトリ内にビデオディレクトリをシンボリックリンクで作成
+                await self.make_symlink(temp_dir_name, service_name, cid)
                 break
         # service_nameのフォルダにマーカーを設置
-        (_created_dir.parent / "automatic_created_dir").touch()
-        (_created_dir.parent.parent / "automatic_created_dir").touch()
-        _created_dir = str(_created_dir)
+        (course_path.parent / "automatic_created_dir").touch()
+        (course_path.parent.parent / "automatic_created_dir").touch()
+        #
         utc = datetime.timezone.utc
         dict_template = {
             "title": title,
@@ -171,17 +222,47 @@ class FilemanagerClass:
             "status": [],
             "meta_data": meta_data,
         }
-        self.write_json(_created_dir + "/info.json", dict_template)
-        await self.write_playlist(_created_dir + "/playlist.m3u8", "init")
-        return str(_created_dir)
+        self.write_json(files_dirname + "/info.json", dict_template)
+        await self.write_playlist(files_dirname + "/playlist.m3u8", "init")
+        return files_dirname
+
+
+    async def copy_video(
+            self, src_vid, dst_service, dst_cid):
+        """
+        シンボリックリンク版ビデオコピー
+        """
+        await self.make_symlink(src_vid, dst_service, dst_cid)
+
+
+    async def recur_unlink(self, delete_path):
+        """
+        再帰的にディレクトリを削除
+          シンボリックリンクを unlink する
+        """
+        if delete_path.is_symlink() :
+            # 対象がシンボリックリンクなら unlink して終了
+            delete_path.unlink()
+        elif delete_path.is_file() :
+            # 対象がファイルなら unlink して終了
+            delete_path.unlink()
+        else:
+            # 再帰的に削除
+            for item in os.listdir(delete_path):
+                child = delete_path / item
+                await self.recur_unlink(child)
+            delete_path.rmdir()
+
 
     async def delete_directory(self, *args):
         """
         ビデオディレクトリの削除関数
+          シンボリックリンクを unlink する
         """
         _delete_dir = "/".join([self.video_dir] + list(args))
+        # 再帰的に削除
         try:
-            await general_module.async_wrap(shutil.rmtree)(_delete_dir)
+            await self.recur_unlink(pathlib.Path(_delete_dir))
         except Exception as e:
             logger.error("削除に失敗しました")
             logger.error(e)
@@ -189,38 +270,6 @@ class FilemanagerClass:
         else:
             return True
 
-    async def delete_video(self, service_name, cid, vid):
-        _delete_dir = "/".join([self.video_dir, service_name, cid, vid])
-        delete_dir = pathlib.Path(_delete_dir)
-        if not (delete_dir / "info.json").exists():
-            logger.warning("管理外のフォルダを削除しようとしました")
-            return False
-
-        # info.json以外削除
-        for filepath in glob.glob(f"{_delete_dir}/*"):
-            if "info.json" in filepath:
-                pass
-            else:
-                await general_module.async_wrap(os.remove)(filepath)
-        # プレイリストの初期化
-        playlist_file = "/".join([self.video_dir, service_name,
-                                 cid, vid, "playlist.m3u8"])
-        await self.write_playlist(playlist_file, "init")
-        # 既存のjsonを読み込み
-        json_file = "/".join([self.video_dir, service_name,
-                             cid, vid, "info.json"])
-        _dict = general_module.read_json_sync(json_file)
-        if not _dict:
-            return False
-        # jsonの更新
-        _dict["resolution"] = []
-        _dict["encode_tasks"] = []
-        _dict["encode_error"] = []
-
-        # jsonの書き込み
-        if self.write_json(json_file, _dict):
-            return True
-        return False
 
     async def delete_original_video(self):
         """

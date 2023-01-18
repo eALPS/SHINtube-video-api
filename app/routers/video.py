@@ -43,7 +43,6 @@ async def upload_endpoint(
         title: str,
         explanation: str,
         meta_data: str = "",
-        year: int = None,
         service_name: str = None,
         in_file: UploadFile = File(...),):
     """
@@ -51,13 +50,11 @@ async def upload_endpoint(
     \n
     引数\n
     in_file :  [動画ファイル]\n
-    service_name(year)    :  [年度]\n
+    service_name :  [年度_サイト]\n
     cid      :  [授業コード]\n
     title     : [動画タイトル]\n
     explanation : [動画説明]\n
     """
-    if service_name is None:
-        service_name = str(year)
     created_dir = await filemanager.create_video_directory(
         service_name, cid, title, explanation, meta_data)
 
@@ -76,19 +73,16 @@ async def emptyupload_endpoint(
         title: str,
         explanation: str,
         meta_data: str = "",
-        year: int = None,
         service_name: str = None,):
     """
     空のinfo.json作成用\n
     あとから、updatevideo・updateinfoが可能\n
     引数\n
-    service_name(year)    :  [年度]\n
+    service_name :  [年度_サイト]\n
     cid      :  [授業コード]\n
     title     : [動画タイトル]\n
     explanation : [動画説明]\n
     """
-    if service_name is None:
-        service_name = str(year)
     created_dir = await filemanager.create_video_directory(
         service_name, cid, title, explanation, meta_data)
     created_dir_path = pathlib.Path(created_dir)
@@ -103,6 +97,9 @@ async def copy_video_directory(src_service_name: str,
                                dst_service_name: str,
                                dst_cid: str,
                                src_vid: str = None,):
+    # シンボリックリンクに書き換え
+    await filemanager.make_symlink(src_vid, dst_service_name, dst_cid)
+    """
     filecopy = FilecopyClass()
     if src_vid is None:
         await filecopy.copy_cid_directory(src_service_name,
@@ -115,6 +112,7 @@ async def copy_video_directory(src_service_name: str,
                                   src_vid,
                                   dst_service_name,
                                   dst_cid)
+    """
     return {"Result": "OK"}
 
 
@@ -165,18 +163,15 @@ async def directory_delete(
 @router.delete("/delete")
 async def video_delete(cid: str,
                        vid: str,
-                       year: int = None,
                        service_name: str = None):
     """
     動画削除用\n
 
     引数\n
-    service_name(year)    :  [年度]\n
+    service_name :  [年度_サイト]\n
     cid      :  [授業コード]\n
     vid      :  [動画コード]\n
     """
-    if service_name is None:
-        service_name = str(year)
     await filemanager.delete_directory(service_name, cid, vid)
     return {"Result": "OK"}
 
@@ -189,14 +184,11 @@ async def update_video(
         title: str,
         explanation: str,
         meta_data: str = "",
-        year: int = None,
         service_name: str = None,
         in_file: UploadFile = File(...)):
     """
     動画修正用
     """
-    if service_name is None:
-        service_name = str(year)
     # meta_dataが空であれば更新しない
     if meta_data == "":
         json_file = "/".join([filemanager.video_dir, str(service_name),
@@ -210,7 +202,7 @@ async def update_video(
 
     background_tasks.add_task(
         backend_file_save_add_encode,
-        f"video/{service_name}/{cid}/{vid}",
+        filemanager.video_dir +  f"/{service_name}/{cid}/{vid}",
         in_file)
     return {"Result": "OK"}
 
@@ -221,15 +213,12 @@ async def update_info(
         vid: str,
         title: str,
         explanation: str,
-        year: int = None,
         service_name: str = None,
         meta_data: str = "",
 ):
     """
     info修正用
     """
-    if service_name is None:
-        service_name = str(year)
     # meta_dataが空であれば更新しない
     if meta_data == "":
         json_file = "/".join([filemanager.video_dir, service_name,
@@ -249,29 +238,23 @@ async def update_info(
 @router.get("/videolist")
 async def video_list(
         cid: str,
-        year: int = None,
         service_name: str = None,):
     """
     動画一覧取得用
     """
-    if service_name is None:
-        service_name = str(year)
     return await database.list_video_id(service_name, cid)
 
 
 @router.get("/linklist")
 async def linklist(
         cid: str,
-        year: int = None,
         service_name: str = None,):
-    if service_name is None:
-        service_name = str(year)
     return await database.list_link(service_name, cid)
 
 
 @router.get("/servicelist")
 async def servicelist():
-    directories = await filemanager.directory_list("video/")
+    directories = await filemanager.directory_list(filemanager.video_dir)
     result = []
     for directory in directories:
         if (directory / "automatic_created_dir").exists():
@@ -281,7 +264,7 @@ async def servicelist():
 
 @router.get("/classlist")
 async def classlist(service_name: str):
-    directories = await filemanager.directory_list("video/" + service_name)
+    directories = await filemanager.directory_list(filemanager.video_dir + "/" + service_name)
     result = []
     for directory in directories:
         if (directory / "automatic_created_dir").exists():
