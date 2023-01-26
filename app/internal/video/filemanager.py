@@ -88,7 +88,10 @@ class FilemanagerClass:
         video_path = "/".join([self.video_dir, service_name, cid, filename])
         video_dir = pathlib.Path(video_path)
         #   シンボリックリンクを相対パスで
-        symlink = "../../../../" + self.make_files_dirname_from_name(filename)
+        symlink = "../../../../../" + self.make_files_dirname_from_name(filename)
+        #    相対パスから root を除く
+        remove_root_path = '/../' + self.root_dir
+        symlink = symlink.replace(remove_root_path, '')
         video_dir.symlink_to(symlink)
 
 
@@ -190,7 +193,7 @@ class FilemanagerClass:
         while True:
             # 保存用ディレクトリ名を生成
             temp_dir_name = general_module.GetRandomStr(40)
-            files_dirname = self.video_dir + "/" + self.make_files_dirname_from_name(temp_dir_name)
+            files_dirname = self.make_files_dirname_from_name(temp_dir_name)
             files_path = pathlib.Path(files_dirname)
             print(files_dirname)
             # 名前衝突のチェック
