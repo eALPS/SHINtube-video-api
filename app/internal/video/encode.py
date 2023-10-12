@@ -188,6 +188,9 @@ class encoder_class:
         nvencエンコード時のコマンド。動画のデコードにはSWが利用される。
         VBRでのエンコードを行う。
         エラー対策のため、実際に出力される動画の解像度は-1されている。
+            -> -1 によりエンコード後の動画が乱れるので -1 しない 
+                                f"scale_cuda=-2:{resolution-1}:interp_algo=lanczos"
+                                f"scale_cuda=-2:{resolution}:interp_algo=lanczos"
         """
         command = [
             "/opt/bin/ffmpeg",
@@ -213,7 +216,7 @@ class encoder_class:
             "-temporal-aq 1",
             (
                 "-vf framerate=30,format=nv12,hwupload,"
-                f"scale_cuda=-2:{resolution-1}:interp_algo=lanczos"
+                f"scale_cuda=-2:{resolution}:interp_algo=lanczos"
             ),
             "-hls_time 6",
             "-hls_list_size 0",
