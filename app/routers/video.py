@@ -1,5 +1,6 @@
 import asyncio
 import pathlib
+import shutil
 
 from fastapi import APIRouter
 from fastapi import BackgroundTasks
@@ -20,12 +21,8 @@ router = APIRouter(
 )
 
 
-async def backend_file_save_add_encode(dir_path, in_file):
-    filename_extension = "".join(in_file.filename.split(".")[-1:])
-    video_file_path = f"./{dir_path}/original_video.{filename_extension}"
-    await filemanager.write_file(video_file_path, in_file)
-    await queue.add_original_video(dir_path,
-                                   f"original_video.{filename_extension}")
+async def backend_add_encode(dir_path, filename):
+    await queue.add_original_video(dir_path, filename)
 
 
 @router.on_event("startup")
@@ -58,10 +55,18 @@ async def upload_endpoint(
     created_dir = await filemanager.create_video_directory(
         service_name, cid, title, explanation, meta_data)
 
+    filename_extension = "".join(in_file.filename.split(".")[-1:])
+    video_file = f"original_video.{filename_extension}"
+    video_file_path = f"./{created_dir}/original_video.{filename_extension}"
+
+    with open(video_file_path, 'w+b') as buffer:
+        shutil.copyfileobj(in_file.file, buffer)
+
     background_tasks.add_task(
-        backend_file_save_add_encode,
+        backend_add_encode,
         created_dir,
-        in_file)
+        video_file)
+
     created_dir_path = pathlib.Path(created_dir)
     vid = created_dir_path.name
     return {"Result": "OK", "vid": vid}
