@@ -1,4 +1,6 @@
 # SHINtube-video-api
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FeALPS%2FSHINtube-video-api.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FeALPS%2FSHINtube-video-api?ref=badge_shield)
+
 Video sharing platform for Shinshu University.
 
 SHINtube-video-apiはffmpegを利用して動画のエンコード、配信を行う動画配信プラットフォームのバックエンドです。
@@ -34,3 +36,6 @@ SHINtube-video-apiはffmpegを利用して動画のエンコード、配信を�
 
 [setup]: docs/setup.md
 
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FeALPS%2FSHINtube-video-api.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FeALPS%2FSHINtube-video-api?ref=badge_large)
